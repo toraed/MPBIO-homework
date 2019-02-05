@@ -1,0 +1,166 @@
+#--Part 1
+# Download a reference yeast genome as compressed archive to the current directory
+<wget https://downloads.yeastgenome.org/sequence/S288C_reference/genome_releases/S288C_reference_genome_Current_Release.tgz>
+
+#Decompress the archive -> creates new directory
+<tar -xzvf S288C_reference_genome_Current_Release.tgz>
+
+#Following instructions
+<ls>
+Output: lists content of current directory (or specified directory)
+
+#Renaming the directory
+<mv S288C_reference_genome_R64-2-1_20150113 data>
+
+#Where am I?
+<pwd>
+#let's move
+<cd data/>
+#did we move?
+<pwd>
+# we did!
+
+# look at big data
+<less rna_coding_R64-2-1_20150113.fasta>
+
+#create directory called results
+<mkdir results>
+
+#Create empty file inside results
+<touch results/counts.txt>
+# renamed it to results_2019_01_29 using previous procedure
+
+#- Part 2 
+#counting lines in specified file
+<wc orf_coding_all_R64-2-1_20150113.fasta>
+output: 161265   446990 11491336 
+# 161265 lines in file
+<wc orf_trans_all_R64-2-1_20150113.fasta>
+output: 60443  344987 5328465
+# 60443 lines in file
+
+#Count the genes and place in counts.txt
+<grep "^>" orf_coding_all_R64-2-1_20150113.fasta | wc -l > results_2019_01_29/counts.txt>
+Output: 6713
+
+#count tRNA genes
+<grep "tRNA" rna_coding_R64-2-1_20150113.fasta | wc -l  >> results_2019_01_29/counts.txt>
+output: 304
+
+# check small file
+<cat counts.txt>
+
+# Make a copy of the file
+<cp results_2019_01_29/counts.txt results_2019_01_29/counts.txt.orig>
+
+#- Part 3
+# get gene experssion data (fold change)
+<wget http://www.cbs.dtu.dk/courses/27619/ex1.dat>
+
+# get annotations
+<wget http://www.cbs.dtu.dk/courses/27619/ex1.acc>
+
+# Merge the files
+<paste ex1.acc ex1.dat > merged.txt>
+
+#- Part 4
+
+# Download and decompress from EggNOG
+<wget http://eggnog5.embl.de/download/eggnog_5.0/data/2759/2759_members.tsv.gz>
+<gunzip 2759_members.tsv.gz>
+
+#cut out the ones that contain human genes (9606)
+grep "9606." 2759_members.tsv | cut -f 2 | sort > groups_hsapiens.txt
+#And the ones containing genes from S.cerevisiae (4891)
+grep "4891." 2759_members.tsv | cut -f 2 | sort > groups_scerevisiae.txt
+
+#QUESTION TIME!
+#I think the dot is included in the search because it marks the end of the taxon ID.
+#Without the dot, I guess we might get other things that just contains the right number.... but in this case we get the same number of rows with and without the dot..
+
+# Using comm to find intersection
+#comm 1: elements present in file 1
+#comm 2: elements present in file 2
+#comm 3: elements present in both <- the one we want
+<comm -12 groups_hsapiens.txt groups_scerevisiae.txt | wc -l>
+Output: 838
+# -12 supresses column 1 and 2
+
+#- Part 5
+#Translating DNA -> RNA (general)
+sed 'y/ACGT/UGCA/' FILE > FILE_RNA
+#Translating DNA -> RNA (ignore headers in fasta)
+sed '/^>/!y/ACGT/UGCA/' FILE.fasta > FILE_RNA.fasta
+# /^>/! = exclude (!)  ">" if in beginning of line(^) 
+
+#Trying it out
+sed '/^>/!y/ACGT/UGCA/' S288C_reference_genome_R64-2-1_20150113/orf_coding_all_R64-2-1_20150113.fasta
+Output: A LOT of text because I forgot to tell it to put it in a file
+
+#- Part 6: Homework!
+#1 Genes in chromosome 2. Using grep. -P was necessary to make it accept '\t'
+# pipe it to wc to count the lines
+<grep -P "^chrII\t" saccharomyces_cerevisiae_R64-2-1_20150113.gff | wc -l>
+Output: 1556
+
+#2 Count GC content.
+#Using grep to find all lines NOT beginning with '>'. Put them in a file
+<grep -v ">" S288C_reference_sequence_R64-2-1_20150113.fsa  > reference.txt>
+
+#Use grep again. -o extracts each C/G as a new line. Doing it separately for G and C
+#There's probably a more elegant way to solve this...
+<grep -o G reference.txt > GCcont.txt>
+<grep -o C reference.txt >> GCcont.txt>
+#Count the lines
+<wc -l GCcont.txt>
+Output: 4637676
+
+#3
+#Download stuff. Got an error message about expired certificate. 
+#Used --no-check-certificate to solve it (my laptop told me to)
+<wget --no-check-certificate https://downloads.yeastgenome.org/sequence/strains/Y55/Y55_SGD_2015_JRIF00000000/Y55_JRIF00000000_SGD_cds.fsa.gz>
+#Decompress
+<gunzip Y55_JRIF00000000_SGD_cds.fsa.gz>
+
+#-a
+#Extracting G and C into new file as in assignment 6.2
+<grep -o G Y55.txt  > GCcont_Y55.txt>
+<grep -o C Y55.txt  >> GCcont_Y55.txt>
+<wc -l GCcont_Y55.txt>
+output: 3191935
+#Much lower GC-content than reference genome.
+
+#-b
+#Count ORF for Y55
+<grep "^>" Y55_JRIF00000000_SGD_cds.fsa | wc -l>
+Output: 5330
+
+#Count ORF for reference
+<grep "^>" orf_coding_all_R64-2-1_20150113.fasta | wc -l>
+Output: 6713
+
+# Strain Y55 has fewer ORFs than reference
+
+#-c
+#Same use of grep as before, but we make sorted files this time
+<grep "^>" orf_coding_all_R64-2-1_20150113.fasta | sort > orf_ref.txt>
+
+#For Y55, remove suffix before sorting
+<grep "^>" Y55_JRIF00000000_SGD_cds.fsa > orf_Y55.txt>
+#grep to extract ORFs into new file
+<sed 's/_Y55//' orf_Y55.txt | sort > ORF_Y55.txt>
+#sed to remove suffix. s tells it to replace according to: 's/regexp/replacement'.
+#Leaving replacement blank -> deletion. Then sort into new file
+
+#Now extracting gene names
+<cut -d ' ' -f 1 ORF_Y55.txt > Genes_Y55>
+Output: File with just gene names, one gene per row
+# setting -d ' ' as delimiter, and cutting the first part = the gene name
+#Same for reference
+<cut -d ' ' -f 1 orf_ref > Genes_ref>
+
+#comparing. wc to count the genes, -12 to supress uninteresting columns
+< comm -12 Genes_Y55 Genes_ref | wc -l>
+Output: 5168
+
+#They have 5168 genes in common
